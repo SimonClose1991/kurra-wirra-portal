@@ -1,0 +1,85 @@
+# Render Blueprint for the Kurra-Wirra Staff Induction Portal
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This deploys ONE web service (Express API + built React frontend on the same
+# origin) plus a managed PostgreSQL database. After the first deploy you must
+# set the "sync: false" secrets in the Render dashboard (Clerk, S3, SMTP).
+
+databases:
+  - name: kurra-wirra-portal-db
+    plan: basic-256mb        # ~US$6-7/mo. Use "free" to trial, but it is DELETED after ~30 days.
+    databaseName: portal
+    user: portal
+
+services:
+  - type: web
+    name: kurra-wirra-portal
+    runtime: node
+    plan: starter            # cheapest always-on instance; "free" spins down when idle
+    region: singapore        # closest Render region to Australia
+    branch: main
+    # Install the whole pnpm workspace, then build the server bundle + frontend
+    # and copy the static build next to the server bundle.
+    buildCommand: |
+      corepack enable
+      pnpm install --no-frozen-lockfile
+      pnpm --filter @workspace/db run push
+      pnpm --filter @workspace/api-server run build:deploy
+    startCommand: pnpm --filter @workspace/api-server run start
+    healthCheckPath: /api/healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      # PORT is provided automatically by Render.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kurra-wirra-portal-db
+          property: connectionString
+
+      # ---- Clerk (set in dashboard) ----
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      # Build-time vars the frontend bundle reads (Vite inlines VITE_* at build).
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: VITE_CLERK_PROXY_URL
+        sync: false
+      - key: BASE_PATH
+        value: "/"
+
+      # ---- Bootstrap admin (Clerk user id of the first admin) ----
+      - key: BOOTSTRAP_ADMIN_CLERK_ID
+        sync: false
+
+      # ---- Object storage: S3-compatible (Cloudflare R2 recommended) ----
+      - key: S3_ENDPOINT
+        sync: false           # e.g. https://<accountid>.r2.cloudflarestorage.com
+      - key: S3_REGION
+        value: auto           # "auto" for R2; a real region (e.g. us-east-1) for AWS
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: PRIVATE_OBJECT_DIR
+        value: uploads
+      - key: PUBLIC_OBJECT_SEARCH_PATHS
+        value: public
+
+      # ---- Email notifications (SMTP; optional) ----
+      - key: SMTP_HOST
+        sync: false           # e.g. smtp.resend.com or smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false           # e.g. Kurra-Wirra Portal <noreply@kurrawirra.com.au>

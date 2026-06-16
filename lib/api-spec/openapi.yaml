@@ -1,0 +1,1544 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Staff Induction Portal API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: sections
+    description: Document sections (Induction Forms, SOPs)
+  - name: categories
+    description: Sub-categories within sections (e.g. Chainsaw Use under SOPs)
+  - name: documents
+    description: Documents within categories
+  - name: completions
+    description: Per-user document completion and signing records
+  - name: users
+    description: User management and admin
+  - name: forms
+    description: Fillable forms within categories
+  - name: storage
+    description: Object storage upload and serving endpoints
+  - name: staff-documents
+    description: Per-employee uploaded documents (licences, certificates, etc.)
+paths:
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '400':
+          description: Invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Failed to generate URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /storage/objects/{objectPath}:
+    get:
+      tags: [storage]
+      operationId: getStorageObject
+      summary: Serve an uploaded object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /forms:
+    get:
+      operationId: getForms
+      tags: [forms]
+      summary: List all forms (optionally filter by categoryId)
+      parameters:
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of forms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Form"
+    post:
+      operationId: createForm
+      tags: [forms]
+      summary: Create a new form (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFormRequest"
+      responses:
+        "201":
+          description: Form created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form"
+
+  /forms/{id}:
+    get:
+      operationId: getForm
+      tags: [forms]
+      summary: Get a single form with its fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Form with fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormWithFields"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      operationId: updateForm
+      tags: [forms]
+      summary: Update a form (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFormRequest"
+      responses:
+        "200":
+          description: Form updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form"
+    delete:
+      operationId: deleteForm
+      tags: [forms]
+      summary: Delete a form (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /forms/{id}/fields:
+    post:
+      operationId: createFormField
+      tags: [forms]
+      summary: Add a field to a form (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFormFieldRequest"
+      responses:
+        "201":
+          description: Field created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormField"
+
+  /forms/{id}/fields/{fieldId}:
+    put:
+      operationId: updateFormField
+      tags: [forms]
+      summary: Update a form field (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFormFieldRequest"
+      responses:
+        "200":
+          description: Field updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormField"
+    delete:
+      operationId: deleteFormField
+      tags: [forms]
+      summary: Delete a form field (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /forms/{id}/submit:
+    post:
+      operationId: submitForm
+      tags: [forms]
+      summary: Submit a form response (staff)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitFormRequest"
+      responses:
+        "201":
+          description: Submission recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormSubmission"
+        "409":
+          description: Already submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /forms/{id}/my-submission:
+    get:
+      operationId: getMyFormSubmission
+      tags: [forms]
+      summary: Get current user's submission for a form
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submission found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormSubmission"
+        "404":
+          description: Not submitted yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /forms/{id}/submissions:
+    get:
+      operationId: getFormSubmissions
+      tags: [forms]
+      summary: Get all submissions for a form (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FormSubmissionWithUser"
+
+  /categories/{id}/notes:
+    get:
+      operationId: getCategoryNotes
+      tags: [categories]
+      summary: Get notes for a category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryNote"
+    post:
+      operationId: upsertCategoryNote
+      tags: [categories]
+      summary: Create or update a note for a category
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertCategoryNoteRequest"
+      responses:
+        "200":
+          description: Note saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryNote"
+
+  /categories/{id}/notes/{noteId}:
+    patch:
+      operationId: updateCategoryNote
+      tags: [categories]
+      summary: Update note content or visibility
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryNoteRequest"
+      responses:
+        "200":
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryNote"
+    delete:
+      operationId: deleteCategoryNote
+      tags: [categories]
+      summary: Delete a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /documents/{id}/notes:
+    get:
+      operationId: getDocumentNotes
+      tags: [documents]
+      summary: Get admin comments for a document (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentNote"
+    post:
+      operationId: createDocumentNote
+      tags: [documents]
+      summary: Add an admin comment to a document (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentNoteRequest"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentNote"
+
+  /documents/{id}/notes/{noteId}:
+    delete:
+      operationId: deleteDocumentNote
+      tags: [documents]
+      summary: Delete an admin comment (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /sections:
+    get:
+      operationId: getSections
+      tags: [sections]
+      summary: List all sections
+      responses:
+        "200":
+          description: List of sections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Section"
+    post:
+      operationId: createSection
+      tags: [sections]
+      summary: Create a section (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSectionBody"
+      responses:
+        "201":
+          description: Created section
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Section"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sections/{id}:
+    patch:
+      operationId: updateSection
+      tags: [sections]
+      summary: Update a section (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSectionBody"
+      responses:
+        "200":
+          description: Updated section
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Section"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteSection
+      tags: [sections]
+      summary: Delete a section (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /categories:
+    get:
+      operationId: getCategories
+      tags: [categories]
+      summary: List all categories, optionally filtered by sectionId
+      parameters:
+        - name: sectionId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      operationId: createCategory
+      tags: [categories]
+      summary: Create a category (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryBody"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /categories/{id}:
+    patch:
+      operationId: updateCategory
+      tags: [categories]
+      summary: Update a category (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryBody"
+      responses:
+        "200":
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: deleteCategory
+      tags: [categories]
+      summary: Delete a category (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /documents:
+    get:
+      operationId: getDocuments
+      tags: [documents]
+      summary: List documents, optionally filtered by categoryId
+      parameters:
+        - name: categoryId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Document"
+    post:
+      operationId: createDocument
+      tags: [documents]
+      summary: Create a document (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentBody"
+      responses:
+        "201":
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /documents/{id}:
+    get:
+      operationId: getDocument
+      tags: [documents]
+      summary: Get a single document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateDocument
+      tags: [documents]
+      summary: Update a document (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentBody"
+      responses:
+        "200":
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a document (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /completions:
+    get:
+      operationId: getCompletions
+      tags: [completions]
+      summary: Get completions for the current user (or all users if admin with userId query)
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of completions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Completion"
+    post:
+      operationId: createCompletion
+      tags: [completions]
+      summary: Mark a document as read and signed by the current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompletionBody"
+      responses:
+        "201":
+          description: Created completion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Completion"
+
+  /completions/{id}:
+    delete:
+      operationId: deleteCompletion
+      tags: [completions]
+      summary: Remove a completion record (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [users]
+      summary: Get all users with their completion progress (admin only)
+      responses:
+        "200":
+          description: List of users with progress
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProgress"
+
+  /admin/users/{clerkUserId}/role:
+    patch:
+      operationId: updateUserRole
+      tags: [users]
+      summary: Set a user's role to admin or staff (admin only)
+      parameters:
+        - name: clerkUserId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRoleBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile and role
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMe"
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile (name)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeBody"
+      responses:
+        "200":
+          description: Updated user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserMe"
+
+  /staff-documents:
+    get:
+      operationId: getStaffDocuments
+      tags: [staff-documents]
+      summary: Get staff documents for a user (self or admin viewing any user)
+      parameters:
+        - name: clerkUserId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of staff documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffDocument"
+    post:
+      operationId: createStaffDocument
+      tags: [staff-documents]
+      summary: Upload a staff document (self or admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffDocumentBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffDocument"
+
+  /staff-documents/{id}:
+    delete:
+      operationId: deleteStaffDocument
+      tags: [staff-documents]
+      summary: Delete a staff document (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /progress/summary:
+    get:
+      operationId: getProgressSummary
+      tags: [completions]
+      summary: Get overall completion statistics across all users (admin view)
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressSummary"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    Section:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - sortOrder
+        - createdAt
+
+    CreateSectionBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - name
+
+    UpdateSectionBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        sectionId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - sectionId
+        - name
+        - sortOrder
+        - createdAt
+
+    CreateCategoryBody:
+      type: object
+      properties:
+        sectionId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+      required:
+        - sectionId
+        - name
+
+    UpdateCategoryBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        sectionId:
+          type: integer
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        content:
+          type: ["string", "null"]
+        requiresSignature:
+          type: boolean
+        sortOrder:
+          type: integer
+        version:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - categoryId
+        - title
+        - requiresSignature
+        - sortOrder
+        - version
+        - createdAt
+
+    CreateDocumentBody:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        content:
+          type: ["string", "null"]
+        requiresSignature:
+          type: boolean
+        sortOrder:
+          type: integer
+      required:
+        - categoryId
+        - title
+
+    UpdateDocumentBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        content:
+          type: ["string", "null"]
+        requiresSignature:
+          type: boolean
+        sortOrder:
+          type: integer
+        categoryId:
+          type: integer
+        bumpVersion:
+          type: boolean
+
+    Completion:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        documentId:
+          type: integer
+        signatureName:
+          type: string
+        documentVersion:
+          type: integer
+        signedAt:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - clerkUserId
+        - documentId
+        - signatureName
+        - documentVersion
+        - signedAt
+        - createdAt
+
+    CreateCompletionBody:
+      type: object
+      properties:
+        documentId:
+          type: integer
+        signatureName:
+          type: string
+      required:
+        - documentId
+        - signatureName
+
+    UserProgress:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+        completedCount:
+          type: integer
+        totalDocuments:
+          type: integer
+        completions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Completion"
+      required:
+        - clerkUserId
+        - email
+        - role
+        - completedCount
+        - totalDocuments
+        - completions
+
+    UpdateMeBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+      required:
+        - firstName
+        - lastName
+
+    UpdateUserRoleBody:
+      type: object
+      properties:
+        role:
+          type: string
+      required:
+        - role
+
+    UserMe:
+      type: object
+      properties:
+        clerkUserId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+      required:
+        - clerkUserId
+        - email
+        - role
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/UploadUrlRequest'
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Form:
+      type: object
+      required: [id, categoryId, title, sortOrder, isRepeatable, notifyAdmins, createdAt]
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        isRepeatable:
+          type: boolean
+        notifyAdmins:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    FormField:
+      type: object
+      required: [id, formId, label, fieldType, required, sortOrder]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        label:
+          type: string
+        fieldType:
+          type: string
+        required:
+          type: boolean
+        placeholder:
+          type: ["string", "null"]
+        options:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+
+    FormWithFields:
+      allOf:
+        - $ref: "#/components/schemas/Form"
+        - type: object
+          required: [fields]
+          properties:
+            fields:
+              type: array
+              items:
+                $ref: "#/components/schemas/FormField"
+
+    CreateFormRequest:
+      type: object
+      required: [categoryId, title]
+      properties:
+        categoryId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        isRepeatable:
+          type: boolean
+        notifyAdmins:
+          type: boolean
+
+    CreateFormFieldRequest:
+      type: object
+      required: [label, fieldType, required, sortOrder]
+      properties:
+        label:
+          type: string
+        fieldType:
+          type: string
+        required:
+          type: boolean
+        placeholder:
+          type: ["string", "null"]
+        options:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+
+    SubmitFormRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties:
+            type: string
+
+    FormSubmission:
+      type: object
+      required: [id, formId, clerkUserId, data, submittedAt]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        clerkUserId:
+          type: string
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        submittedAt:
+          type: string
+          format: date-time
+
+    FormSubmissionWithUser:
+      allOf:
+        - $ref: "#/components/schemas/FormSubmission"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/UserMe"
+
+    CategoryNote:
+      type: object
+      required: [id, categoryId, clerkUserId, content, isAdminNote, isVisibleToStaff, createdAt]
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: integer
+        clerkUserId:
+          type: string
+        content:
+          type: string
+        isAdminNote:
+          type: boolean
+        isVisibleToStaff:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        authorName:
+          type: ["string", "null"]
+
+    UpsertCategoryNoteRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        isAdminNote:
+          type: boolean
+        isVisibleToStaff:
+          type: boolean
+
+    UpdateCategoryNoteRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        isVisibleToStaff:
+          type: boolean
+
+    DocumentNote:
+      type: object
+      required: [id, documentId, clerkUserId, content, createdAt]
+      properties:
+        id:
+          type: integer
+        documentId:
+          type: integer
+        clerkUserId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        authorName:
+          type: ["string", "null"]
+
+    CreateDocumentNoteRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    StaffDocument:
+      type: object
+      required: [id, clerkUserId, title, objectPath, fileUrl, uploadedAt]
+      properties:
+        id:
+          type: integer
+        clerkUserId:
+          type: string
+        title:
+          type: string
+        objectPath:
+          type: string
+        fileUrl:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+
+    CreateStaffDocumentBody:
+      type: object
+      required: [title, objectPath, fileUrl]
+      properties:
+        title:
+          type: string
+        objectPath:
+          type: string
+        fileUrl:
+          type: string
+        clerkUserId:
+          type: string
+
+    ProgressSummary:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalDocuments:
+          type: integer
+        totalCompletions:
+          type: integer
+        fullyCompletedUsers:
+          type: integer
+      required:
+        - totalUsers
+        - totalDocuments
+        - totalCompletions
+        - fullyCompletedUsers
