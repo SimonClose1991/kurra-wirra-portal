@@ -1,5 +1,7 @@
 packages:
   - artifacts/*
+  - api-server
+  - induction-app
   - lib/*
   - lib/integrations/*
   - scripts
