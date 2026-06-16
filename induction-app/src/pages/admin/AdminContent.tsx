@@ -99,13 +99,13 @@ export default function AdminContent() {
         <p className="text-muted-foreground mt-2">Organise modules, categories, and induction documents.</p>
       </div>
 
-      <Tabs defaultValue="documents" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="forms">Forms</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="sections">Modules</TabsTrigger>
-        </TabsList>
+         <Tabs defaultValue="sections" className="w-full">
+           <TabsList className="mb-4">
+             <TabsTrigger value="sections">Modules</TabsTrigger>
+             <TabsTrigger value="categories">Categories</TabsTrigger>
+             <TabsTrigger value="forms">Forms</TabsTrigger>
+             <TabsTrigger value="documents">Documents</TabsTrigger>
+           </TabsList>
 
         {/* DOCUMENTS TAB */}
         <TabsContent value="documents">
