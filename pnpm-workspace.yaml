@@ -31,6 +31,7 @@ catalog:
 minimumReleaseAge: 1440
 
 onlyBuiltDependencies:
+  - '@clerk/shared'
   - '@swc/core'
   - esbuild
   - msw
