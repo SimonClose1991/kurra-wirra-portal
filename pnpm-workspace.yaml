@@ -37,6 +37,15 @@ onlyBuiltDependencies:
   - msw
   - unrs-resolver
 
+  allowBuilds:
+     '@clerk/shared': true
+     '@swc/core': true
+     esbuild: true
+     msw: true
+     unrs-resolver: true
+
+   strictDepBuilds: false
+
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
   '@expo/ngrok-bin>@expo/ngrok-bin-darwin-arm64': '-'
