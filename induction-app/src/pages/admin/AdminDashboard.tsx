@@ -1,11 +1,11 @@
-import { useGetAdminUsers, useGetProgressSummary, useUpdateUserRole, useGetMe } from "@workspace/api-client-react";
+import { useGetAdminUsers, useGetProgressSummary, useUpdateUserRole, useGetMe, useGetAdminNotifications } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, FileText, CheckCircle, Search, Shield, ShieldOff } from "lucide-react";
+import { Users, FileText, CheckCircle, Search, Shield, ShieldOff, Bell } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ export default function AdminDashboard() {
   const { data: users, isLoading: isLoadingUsers } = useGetAdminUsers();
   const { data: summary, isLoading: isLoadingSummary } = useGetProgressSummary();
   const { data: me } = useGetMe();
+  const { data: notifications } = useGetAdminNotifications();
   const { user: clerkUser } = useUser();
   const updateUserRole = useUpdateUserRole();
   const { toast } = useToast();
@@ -63,6 +64,28 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {(notifications?.unseenCount ?? 0) > 0 && (
+        <Link href="/admin/notifications">
+          <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 cursor-pointer hover:bg-amber-100 transition-colors">
+            <div className="relative shrink-0">
+              <Bell className="h-5 w-5 text-amber-600" />
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                {notifications!.unseenCount}
+              </span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-900">
+                {notifications!.unseenCount} new form{notifications!.unseenCount === 1 ? "" : "s"} submitted
+              </p>
+              <p className="text-xs text-amber-700">
+                Tap to review submissions that need your attention.
+              </p>
+            </div>
+            <span className="text-sm font-medium text-amber-700 shrink-0">Review →</span>
+          </div>
+        </Link>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
