@@ -23,6 +23,7 @@ import AdminContent from "@/pages/admin/AdminContent";
 import AdminDocumentForm from "@/pages/admin/AdminDocumentForm";
 import AdminFormBuilder from "@/pages/admin/AdminFormBuilder";
 import AdminFormSubmissions from "@/pages/admin/AdminFormSubmissions";
+import AdminNotifications from "@/pages/admin/AdminNotifications";
 import FillForm from "@/pages/FillForm";
 import StaffDocuments from "@/pages/StaffDocuments";
 
@@ -192,6 +193,7 @@ function ClerkProviderWithRoutes() {
                 
                 {/* Admin Routes */}
                 <Route path="/admin" component={() => <ProtectedRoute component={AdminDashboard} requireAdmin />} />
+                <Route path="/admin/notifications" component={() => <ProtectedRoute component={AdminNotifications} requireAdmin />} />
                 <Route path="/admin/users/:clerkUserId" component={() => <ProtectedRoute component={AdminUser} requireAdmin />} />
                 <Route path="/admin/content" component={() => <ProtectedRoute component={AdminContent} requireAdmin />} />
                 <Route path="/admin/document/new" component={() => <ProtectedRoute component={AdminDocumentForm} requireAdmin />} />
