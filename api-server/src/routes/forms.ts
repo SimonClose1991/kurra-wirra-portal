@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { formsTable, formFieldsTable, formSubmissionsTable, usersTable } from "@workspace/db";
-import { eq, asc, and, inArray } from "drizzle-orm";
+import { eq, asc, desc, and, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
 import { CreateFormBody, UpdateFormBody, CreateFormFieldBody, UpdateFormFieldBody, SubmitFormBody } from "@workspace/api-zod";
 import { notifyAdminsOfSubmission } from "../lib/gmail";
@@ -268,5 +268,65 @@ router.get("/forms/:id/submissions", requireAdmin, async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+// --- Admin notifications: form submissions flagged notifyAdmins ---
+router.get("/admin/notifications", requireAdmin, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
 
+    const meRows = await db.select().from(usersTable)
+      .where(eq(usersTable.clerkUserId, clerkUserId)).limit(1);
+    const seenAt = meRows[0]?.notificationsSeenAt ?? null;
+
+    const notifyForms = await db.select().from(formsTable)
+      .where(eq(formsTable.notifyAdmins, true));
+    const notifyFormIds = notifyForms.map(f => f.id);
+    const formTitleMap = new Map(notifyForms.map(f => [f.id, f.title]));
+
+    if (notifyFormIds.length === 0) {
+      res.json({ unseenCount: 0, submissions: [] });
+      return;
+    }
+
+    const submissions = await db.select().from(formSubmissionsTable)
+      .where(inArray(formSubmissionsTable.formId, notifyFormIds))
+      .orderBy(desc(formSubmissionsTable.submittedAt));
+
+    const clerkUserIds = [...new Set(submissions.map(s => s.clerkUserId))];
+    const users = clerkUserIds.length > 0
+      ? await db.select().from(usersTable).where(inArray(usersTable.clerkUserId, clerkUserIds))
+      : [];
+    const userMap = new Map(users.map(u => [u.clerkUserId, u]));
+
+    const result = submissions.map(s => ({
+      id: s.id,
+      formId: s.formId,
+      formTitle: formTitleMap.get(s.formId) ?? "Form",
+      submittedAt: s.submittedAt,
+      data: JSON.parse(s.data),
+      user: userMap.get(s.clerkUserId) ?? null,
+    }));
+
+    const unseenCount = seenAt
+      ? result.filter(s => new Date(s.submittedAt) > new Date(seenAt)).length
+      : result.length;
+
+    res.json({ unseenCount, submissions: result });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get admin notifications");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/admin/notifications/seen", requireAdmin, async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    await db.update(usersTable)
+      .set({ notificationsSeenAt: new Date() })
+      .where(eq(usersTable.clerkUserId, clerkUserId));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "Failed to mark notifications seen");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 export default router;
